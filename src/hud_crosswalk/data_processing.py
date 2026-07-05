@@ -4,7 +4,7 @@ import numpy as np
 from tabulate import tabulate
 
 
-class DataProcessing():
+class DataProcessing:
     def __init__(self):
         pass
 

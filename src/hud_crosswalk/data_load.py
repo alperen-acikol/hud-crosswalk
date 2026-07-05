@@ -1,16 +1,13 @@
-#Packages
-import os 
-import sys
+# Packages
+import os
 import pandas as pd
-import requests 
+import requests
 
 
 class DataLoad:
     def __init__(self):
         pass
 
-
-## Data Load Function
     def data_load(self, path, filename) -> pd.DataFrame | None:
         '''
         Loads a csv or xlsx file from a given path and filename.
@@ -22,7 +19,7 @@ class DataLoad:
             Folder path containing the file.
         filename : str
             Filename without the extension. Partial names are supported —
-            the function will match any file containing the provided string. 
+            the function will match any file containing the provided string.
 
         Returns
         -------
@@ -50,18 +47,7 @@ class DataLoad:
             print(f'{filename} does not exist in {path}')
             return None
 
- 
-
-## HUDS API Global Parameter Function
-    def huds_api(self,api_token):
-        '''
-        Prompts user to input their HUD API token and stores it as an instance attribute.
-        Can be accessed by other methods via self.api without needing to pass it explicitly.
-        '''
-        self.api = api_token
-
-## HUDS URL Modifier Function
-    def huds_url_modifier(self,type,query='All',year=None,quarter=None):
+    def huds_url_modifier(self, crosswalk_type, query='All', year=None, quarter=None) -> dict:
         '''
         Builds the query parameter dictionary for the HUD API request.
 
@@ -76,56 +62,63 @@ class DataLoad:
         quarter : int, optional
             Quarter (1-4). Defaults to latest if None.
 
+        Returns
+        -------
+        dict
+            Dictionary of query parameters for the HUD API request.
+            None values are stripped to avoid sending them as literal query
+            string values.
+
         See: https://www.huduser.gov/portal/dataset/uspszip-api.html
         '''
         url_params = {
-            "crosswalk_type":type,
-            "query":query,
+            "type": crosswalk_type,
+            "query": query,
             "year": year,
-            "quarter":quarter
-            }
+            "quarter": quarter
+        }
+        # strip None values so they are not sent in the request
+        url_params = {k: v for k, v in url_params.items() if v is not None}
         return url_params
 
-## HUDS API Call Function
-    def api_call(self,api_token,url_params):
+    def api_call(self, api_token, url_params) -> pd.DataFrame | None:
         '''
         Makes a GET request to the HUD USPS Crosswalk API and returns the response data.
 
         Parameters
         ----------
+        api_token : str
+            HUD API token. Register for a free token at:
+            https://www.huduser.gov/portal/dataset/uspszip-api.html
         url_params : dict
             Dictionary of query parameters built by huds_url_modifier().
-            Contains type, query, year, and quarter keys.
-
-        Notes
-        -----
-            Requires huds_api() to be called first to set self.api.
-            Requires huds_url_modifier() to be called first to build url_params.
+            Contains type, query, and optionally year and quarter keys.
 
         Returns
         -------
-            pd.DataFrame
+        pd.DataFrame
             DataFrame of crosswalk results if successful.
+        None
             Prints an error message and returns None if the request fails.
         '''
         response_codes = {
-            200 : 'Request was successful',
-            400 : 'An invalid value was specified for one of the query parameters in the request URI',
-            401 : 'Authentication failure',
-            403 : 'Not allowed to access this dataset API because you have not registered for it',
-            404 : 'No data found using value you entered',
-            405 : 'Unsupported method, only GET is supported',
-            406 : 'Unsupported Accept Header value, must be application/json',
-            500 : 'Internal server error occurred'
-            }
-        
+            200: 'Request was successful',
+            400: 'An invalid value was specified for one of the query parameters in the request URI',
+            401: 'Authentication failure',
+            403: 'Not allowed to access this dataset API because you have not registered for it',
+            404: 'No data found using value you entered',
+            405: 'Unsupported method, only GET is supported',
+            406: 'Unsupported Accept Header value, must be application/json',
+            500: 'Internal server error occurred'
+        }
+
         huds_url = "https://www.huduser.gov/hudapi/public/usps"
-        headers ={"Authorization": f"Bearer {api_token}"}
-        response = requests.get(huds_url,headers=headers,params=url_params)
-        if response.status_code !=200:
-            print(f"{response.status_code}:{response_codes.get(response.status_code,f'Unknown status code: {response.status_code}')}")
+        headers = {"Authorization": f"Bearer {api_token}"}
+        response = requests.get(huds_url, headers=headers, params=url_params)
+
+        if response.status_code != 200:
+            print(f"{response.status_code}: {response_codes.get(response.status_code, f'Unknown status code: {response.status_code}')}")
+            return None
         else:
             huds_crosswalk_data = pd.DataFrame(response.json()["data"]["results"])
-        return huds_crosswalk_data
-
-
+            return huds_crosswalk_data
